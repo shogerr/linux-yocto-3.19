@@ -114,6 +114,9 @@ look_latter_request(struct request_queue *q, struct request *rq)
 
 static int look_init_queue(struct request_queue *q, struct elevator_type *e)
 {
+	printk("starting look io scheduler");
+	position = 0;
+	direction = RIGHT;
 	struct look_data *nd;
 	struct elevator_queue *eq;
 
@@ -133,6 +136,7 @@ static int look_init_queue(struct request_queue *q, struct elevator_type *e)
 	spin_lock_irq(q->queue_lock);
 	q->elevator = eq;
 	spin_unlock_irq(q->queue_lock);
+	
 	return 0;
 }
 
