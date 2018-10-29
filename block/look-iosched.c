@@ -8,6 +8,13 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 
+#define LEFT 0
+#define RIGHT 1
+
+int direction;
+int position;
+
+
 struct look_data {
 	struct list_head queue;
 };
@@ -16,26 +23,72 @@ static void look_merged_requests(struct request_queue *q, struct request *rq,
 				 struct request *next)
 {
 	list_del_init(&next->queuelist);
+	//elv_dispatch_sort(q, next);
 }
 
 static int look_dispatch(struct request_queue *q, int force)
 {
 	struct look_data *nd = q->elevator->elevator_data;
+        struct request *next_rq;
+        struct request *prev_rq;
 
-	if (!list_empty(&nd->queue)) {
-		struct request *rq;
-		rq = list_entry(nd->queue.next, struct request, queuelist);
-		list_del_init(&rq->queuelist);
-		elv_dispatch_sort(q, rq);
+        //if the list is not empty
+        if (!list_empty(&nd->queue)) {
+        	next_rq = list_entry(nd->queue.next, struct request, queuelist);
+             	list_start = list_entry(nd->queue.next, struct request, queuellist);
+		//if there more than one element, move to the closest element
+       		if (next_rq != line_start) {
+			struct request *tmp_rq;
+			// walk through linked list
+			list_for_each(tmp_rq, &nd->queue){
+				int temp_pos = blk_rq_pos(tmp_rq);
+				int temp_dist = abs(position - temp_pos);
+				int next_pos = blk_rq_pos(next_rq);
+				int next_dist = abs(next_pos - position);
+				//check if each request is closer to your
+				//current position than the next_rq
+				if (tmp_dist < next_dist) {
+					next_rq = tmp_rq;
+					if (next_pos < position)
+					{
+						direction = LEFT;
+					}
+					else
+					{
+						direction = RIGHT;
+					}
+				}
+			}
+		}
+		else {
+			printk("Only one element in list");
+		}
+		//dispatch the request at the current head
+		position = blk_rq_pos(next_rq) + blk_rq_sectors(next_rq);
+		list_del_init(&next_rq->queuelist);
+		elv_dispatch_sort(q, next_rq);
+		printk("dispatching element at %d.", blk_rq_pos);
 		return 1;
 	}
+	else
+	{
+		printk("list empty");
+		if(direction == LEFT){
+			position = 0;
+			direction = RIGHT;
+		}
+		else {
+			position = ULONG_MAX/2;
+			direction = LEFT;
+		}
+	}
+
 	return 0;
 }
 
 static void look_add_request(struct request_queue *q, struct request *rq)
 {
 	struct look_data *nd = q->elevator->elevator_data;
-
 	list_add_tail(&rq->queuelist, &nd->queue);
 }
 
