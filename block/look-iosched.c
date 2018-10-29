@@ -12,7 +12,7 @@
 #define RIGHT 1
 
 int direction;
-int position;
+sector_t position;
 
 
 struct look_data {
@@ -30,25 +30,31 @@ static int look_dispatch(struct request_queue *q, int force)
 {
 	struct look_data *nd = q->elevator->elevator_data;
         struct request *next_rq;
-        struct request *prev_rq;
+        struct request *list_start;
+	struct list_head *temp_head;
+	struct request *temp_rq;
+	sector_t temp_pos;
+	int temp_dist;
+	sector_t next_pos;
+	int next_dist;
 
         //if the list is not empty
         if (!list_empty(&nd->queue)) {
         	next_rq = list_entry(nd->queue.next, struct request, queuelist);
-             	list_start = list_entry(nd->queue.next, struct request, queuellist);
+             	list_start = list_entry(nd->queue.next, struct request, queuelist);
 		//if there more than one element, move to the closest element
-       		if (next_rq != line_start) {
-			struct request *tmp_rq;
+       		if (next_rq != list_start) {
 			// walk through linked list
-			list_for_each(tmp_rq, &nd->queue){
-				int temp_pos = blk_rq_pos(tmp_rq);
-				int temp_dist = abs(position - temp_pos);
-				int next_pos = blk_rq_pos(next_rq);
-				int next_dist = abs(next_pos - position);
+			list_for_each(temp_head, &nd->queue){
+				temp_rq = list_entry(temp_head, struct request, queuelist);
+				temp_pos = blk_rq_pos(temp_rq);
+				temp_dist = abs(position - temp_pos);
+				next_pos = blk_rq_pos(next_rq);
+				next_dist = abs(next_pos - position);
 				//check if each request is closer to your
 				//current position than the next_rq
-				if (tmp_dist < next_dist) {
-					next_rq = tmp_rq;
+				if (temp_dist < next_dist) {
+					next_rq = temp_rq;
 					if (next_pos < position)
 					{
 						direction = LEFT;
@@ -67,7 +73,7 @@ static int look_dispatch(struct request_queue *q, int force)
 		position = blk_rq_pos(next_rq) + blk_rq_sectors(next_rq);
 		list_del_init(&next_rq->queuelist);
 		elv_dispatch_sort(q, next_rq);
-		printk("dispatching element at %d.", blk_rq_pos);
+		printk("dispatching element at %llu.", blk_rq_pos(next_rq));
 		return 1;
 	}
 	else
@@ -114,11 +120,11 @@ look_latter_request(struct request_queue *q, struct request *rq)
 
 static int look_init_queue(struct request_queue *q, struct elevator_type *e)
 {
+	struct look_data *nd;
+	struct elevator_queue *eq;
 	printk("starting look io scheduler");
 	position = 0;
 	direction = RIGHT;
-	struct look_data *nd;
-	struct elevator_queue *eq;
 
 	eq = elevator_alloc(q, e);
 	if (!eq)
