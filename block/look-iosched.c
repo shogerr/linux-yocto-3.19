@@ -22,8 +22,9 @@ struct look_data {
 static void look_merged_requests(struct request_queue *q, struct request *rq,
 				 struct request *next)
 {
+	printk(KERN_INFO "merging\n");
 	list_del_init(&next->queuelist);
-	//elv_dispatch_sort(q, next);
+	elv_dispatch_sort(q, next);
 }
 
 static int look_dispatch(struct request_queue *q, int force)
@@ -41,9 +42,10 @@ static int look_dispatch(struct request_queue *q, int force)
         //if the list is not empty
         if (!list_empty(&nd->queue)) {
         	next_rq = list_entry(nd->queue.next, struct request, queuelist);
-             	list_start = list_entry(nd->queue.next, struct request, queuelist);
+             	list_start = list_entry(nd->queue.prev, struct request, queuelist);
 		//if there more than one element, move to the closest element
        		if (next_rq != list_start) {
+			printk(KERN_INFO "more than one element in list\n");
 			// walk through linked list
 			list_for_each(temp_head, &nd->queue){
 				temp_rq = list_entry(temp_head, struct request, queuelist);
@@ -54,31 +56,38 @@ static int look_dispatch(struct request_queue *q, int force)
 				//check if each request is closer to your
 				//current position than the next_rq
 				if (temp_dist < next_dist) {
+					//if it is make it the next_rq
 					next_rq = temp_rq;
 					if (next_pos < position)
 					{
+						//decreasing in value
+						printk(KERN_INFO "moving left\n");
 						direction = LEFT;
 					}
 					else
 					{
+						//increasing in value
+						printk(KERN_INFO "moving right\n");
 						direction = RIGHT;
 					}
 				}
 			}
 		}
 		else {
-			printk("Only one element in list");
+			printk(KERN_INFO "Only one element in list.\n");
 		}
 		//dispatch the request at the current head
 		position = blk_rq_pos(next_rq) + blk_rq_sectors(next_rq);
 		list_del_init(&next_rq->queuelist);
 		elv_dispatch_sort(q, next_rq);
-		printk("dispatching element at %llu.", blk_rq_pos(next_rq));
+		printk(KERN_INFO "dispatching element at %llu.\n", blk_rq_pos(next_rq));
 		return 1;
 	}
 	else
 	{
-		printk("list empty");
+		//if the list is empty push the current position 
+		//to either extreme and switch directions
+		printk(KERN_INFO "list empty.\n");
 		if(direction == LEFT){
 			position = 0;
 			direction = RIGHT;
@@ -94,8 +103,10 @@ static int look_dispatch(struct request_queue *q, int force)
 
 static void look_add_request(struct request_queue *q, struct request *rq)
 {
+	//add to the front, unordered
 	struct look_data *nd = q->elevator->elevator_data;
 	list_add_tail(&rq->queuelist, &nd->queue);
+	printk(KERN_INFO "adding element at %llu.\n", blk_rq_pos(rq));
 }
 
 static struct request *
@@ -122,7 +133,7 @@ static int look_init_queue(struct request_queue *q, struct elevator_type *e)
 {
 	struct look_data *nd;
 	struct elevator_queue *eq;
-	printk("starting look io scheduler");
+	printk(KERN_INFO "starting look io scheduler.\n");
 	position = 0;
 	direction = RIGHT;
 
